@@ -120,7 +120,7 @@ app.post("/v1/entries/:id/process", async (req, res) => {
         },
         { role: "user", content: `這是長輩說的話：${entry.transcript}` }
       ],
-      model: "llama3-8b-8192",
+      model: "llama-3.3-70b-versatile",
       response_format: { type: "json_object" }
     });
 

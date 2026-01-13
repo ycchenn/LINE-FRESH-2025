@@ -69,24 +69,22 @@
     sendBtn.onclick = async () => {
         const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
         const formData = new FormData();
-        formData.append('audio', audioBlob, 'voice_sick.webm'); 
+        formData.append('audio', audioBlob, 'voice_input.webm'); 
 
         try {
             elderStatus.innerText = '正在上傳音檔...';
             const res = await fetch(`${API_BASE}/v1/entries`, { method: 'POST', body: formData });
             const data = await res.json();
             
-            // 【重要】直接存入 localStorage，讓所有人都能拿到
             localStorage.setItem('target_id', data.id);
             console.log("上傳成功，取得 ID:", data.id);
             
-            elderStatus.innerText = '上傳成功 (ID: ' + data.id + ')';
+            elderStatus.innerText = '上傳成功，AI 分析中...';
             sendBtn.disabled = true;
 
             // 觸發 AI 處理
             await fetch(`${API_BASE}/v1/entries/${data.id}/process`, { method: 'POST' });
             
-            // 直接啟動監聽
             startPolling();
 
         } catch (err) {
@@ -95,13 +93,10 @@
         }
     };
 
-    // --- 晚輩端監聽邏輯 ---
     function startPolling() {
-        // 每次啟動前先清掉舊的計時器，避免疊加
         if (window.activeTimer) clearInterval(window.activeTimer);
 
         window.activeTimer = setInterval(async () => {
-            // 從 LocalStorage 拿 ID
             const pollId = localStorage.getItem('target_id');
             if (!pollId) return;
 
@@ -112,16 +107,22 @@
                 const data = await res.json();
                 console.log(`監聽 ID: ${pollId}, 狀態: ${data.status}`);
 
-                // 只要狀態是 READY 或內容已經跑出來了就顯示
-                if ((data.status === 'READY' || data.ai) && data.ai.summary3) {
+                // --- 核心修正處：嚴格檢查 AI 資料是否真的「有內容」了 ---
+                if (data.status === 'READY' && data.ai && data.ai.summary3 && data.ai.summary3.length > 0) {
                     document.getElementById('junior-status').innerText = '收到新訊息！';
                     document.getElementById('ai-summary').style.display = 'block';
-                    document.getElementById('res-emotion').innerText = data.ai.emotion;
-                    document.getElementById('res-summary').innerHTML = data.ai.summary3.map(s => `<li>${s}</li>`).join('');
+                    document.getElementById('res-emotion').innerText = data.ai.emotion || "分析中";
                     
-                    document.getElementById('reply-btns').innerHTML = data.ai.quickReplies.map(text => 
-                        `<button onclick="sendReply('${pollId}', '${text}')">${text}</button>`
-                    ).join('');
+                    // 渲染摘要清單
+                    document.getElementById('res-summary').innerHTML = data.ai.summary3
+                        .map(s => `<li>${s}</li>`).join('');
+                    
+                    // 渲染回覆按鈕
+                    if (data.ai.quickReplies) {
+                        document.getElementById('reply-btns').innerHTML = data.ai.quickReplies
+                            .map(text => `<button onclick="sendReply('${pollId}', '${text}')">${text}</button>`)
+                            .join('');
+                    }
                 }
 
                 if (data.status === 'REPLIED') {
@@ -129,7 +130,7 @@
                     clearInterval(window.activeTimer);
                 }
             } catch (err) {
-                console.log("等待伺服器回應...");
+                console.log("正在等待 AI 回應...");
             }
         }, 2000);
     }
@@ -143,7 +144,6 @@
         alert('回覆已送出');
     }
 
-    // 頁面載入時，如果發現有舊的 ID，自動開啟監聽（Demo 保險）
     window.onload = () => {
         if (localStorage.getItem('target_id')) {
             startPolling();
