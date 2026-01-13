@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>LINE SWEET HOME </title>
+    <style>
+        body { display: flex; height: 100vh; margin: 0; font-family: sans-serif; }
+        .side { flex: 1; padding: 20px; border: 1px solid #ccc; display: flex; flex-direction: column; }
+        .elder { background-color: #e8f5e9; } /*淺綠 */
+        .junior { background-color: #e3f2fd; } /*淺藍 */
+        button { padding: 10px; margin: 5px 0; cursor: pointer; font-size: 16px; }
+        .card { background: white; padding: 15px; border-radius: 8px; margin-top: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .status { font-weight: bold; color: #d32f2f; }
+    </style>
+</head>
+<body>
+
+<div class="side elder">
+    <h2>長輩端流程</h2>
+    <p>狀態：<span id="elder-status">待命</span></p>
+    <button id="record-btn">1. 開始錄音</button>
+    <button id="send-btn" disabled>2. 發送給 AI 助手</button>
+    <div id="elder-notice" class="card" style="display:none; border: 2px solid #4caf50;">
+        通知：晚輩已回應你的訊息！
+    </div>
+</div>
+
+<div class="side junior">
+    <h2>晚輩端流程</h2>
+    <p>狀態：<span id="junior-status">等待新訊息...</span></p>
+    
+    <div id="ai-summary" class="card" style="display:none;">
+        <div style="background:#ffc107; display:inline-block; padding:2px 8px; border-radius:4px;">AI 摘要內容</div>
+        <p><strong>情緒：</strong> <span id="res-emotion"></span></p>
+        <ul id="res-summary"></ul>
+        <div id="reply-box">
+            <p>快速回覆：</p>
+            <div id="reply-btns"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let mediaRecorder;
+    let audioChunks = [];
+    let currentId = null;
+    const API_BASE = "http://localhost:8787";
+
+    // --- 長輩端邏輯 ---
+    const recordBtn = document.getElementById('record-btn');
+    const sendBtn = document.getElementById('send-btn');
+    const elderStatus = document.getElementById('elder-status');
+
+    recordBtn.onclick = async () => {
+        if (recordBtn.innerText === '1. 開始錄音') {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+            mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+            mediaRecorder.start();
+            recordBtn.innerText = '停止錄音';
+            elderStatus.innerText = '錄音中...';
+        } else {
+            mediaRecorder.stop();
+            recordBtn.innerText = '1. 開始錄音';
+            elderStatus.innerText = '錄音完畢，準備發送';
+            sendBtn.disabled = false;
+        }
+    };
+
+    sendBtn.onclick = async () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'voice_sick.webm'); 
+
+        const res = await fetch(`${API_BASE}/v1/entries`, { method: 'POST', body: formData });
+        const data = await res.json();
+        currentId = data.id;
+        elderStatus.innerText = '訊息已發送至雲端 (ID: ' + currentId + ')';
+        sendBtn.disabled = true;
+
+        
+        await fetch(`${API_BASE}/v1/entries/${currentId}/process`, { method: 'POST' });
+        startPolling(); // 開始監聽晚輩端
+    };
+
+    // --- 晚輩端監聽邏輯 (Polling) ---
+    function startPolling() {
+        const timer = setInterval(async () => {
+            const res = await fetch(`${API_BASE}/v1/entries/${currentId}`);
+            const data = await res.json();
+
+            if (data.status === 'READY') {
+                document.getElementById('junior-status').innerText = '收到新訊息！';
+                document.getElementById('ai-summary').style.display = 'block';
+                document.getElementById('res-emotion').innerText = data.ai.emotion;
+                document.getElementById('res-summary').innerHTML = data.ai.summary3.map(s => `<li>${s}</li>`).join('');
+                
+                // 渲染回覆按鈕
+                document.getElementById('reply-btns').innerHTML = data.ai.quickReplies.map(text => 
+                    `<button onclick="sendReply('${text}')">${text}</button>`
+                ).join('');
+            }
+
+            if (data.status === 'REPLIED') {
+                document.getElementById('elder-notice').style.display = 'block';
+                clearInterval(timer); // 停止監聽
+            }
+        }, 2000);
+    }
+
+    async function sendReply(text) {
+        await fetch(`${API_BASE}/v1/entries/${currentId}/reply`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text })
+        });
+        alert('回覆已送出');
+    }
+</script>
+</body>
+</html>
