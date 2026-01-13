@@ -3,6 +3,13 @@ const multer = require("multer");
 const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
+const { OpenAI } = require('openai');
+
+// 初始化 Groq (使用 OpenAI 的 SDK 轉接)
+const groq = new OpenAI({
+    apiKey: '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', 
+    baseURL: "https://api.groq.com/openai/v1" 
+});
 
 const app = express();
 app.use(cors());
@@ -74,68 +81,68 @@ app.post("/v1/entries", upload.single("audio"), (req, res) => {
 
 /**
  * POST /v1/entries/:id/process
- * body: { demoMode?: boolean }
+ * 真實 AI 處理：Groq Whisper 轉文字 + Groq Llama 3 摘要
  */
 app.post("/v1/entries/:id/process", async (req, res) => {
   const { id } = req.params;
   const entry = db[id];
   if (!entry) return res.status(404).json({ error: "entry not found" });
 
-  const demoMode = (req.body?.demoMode ?? entry.meta?.demoMode ?? true) !== false;
-
+  // 1. 進入處理中狀態
   entry.status = "PROCESSING";
   saveDb(db);
-
   const t0 = Date.now();
 
-  // === DemoMode: 固定輸出（最穩） ===
-  // 你可以依不同測資音檔名做不同摘要（可選）
-  const fname = (entry.audio?.originalName || "").toLowerCase();
-  const isWorried = fname.includes("worry") || fname.includes("sick") || fname.includes("病");
+  try {
+    console.log(`[Groq AI] 正在為 ID: ${id} 啟動真 AI 引擎...`);
 
-  if (demoMode) {
-    entry.transcript = isWorried
-      ? "今天去看醫生，血壓有點高，晚上有點睡不好。"
-      : "今天去公園散步，遇到老朋友，心情很好。";
+    // 2. 語音轉文字 (Whisper-large-v3)
+    const transcription = await groq.audio.transcriptions.create({
+      file: fs.createReadStream(entry.audio.localPath),
+      model: "whisper-large-v3",
+      language: "zh", 
+    });
 
-    entry.ai = isWorried
-      ? {
-          summary3: ["今天去看醫生檢查", "血壓偏高有點擔心", "晚上睡得不太好"],
-          emotion: "擔心",
-          quickReplies: [
-            "我有看到，辛苦你了，先好好休息",
-            "醫生怎麼說？需要我幫你安排嗎？",
-            "記得按時吃藥，我晚點再打給你"
-          ]
-        }
-      : {
-          summary3: ["今天去公園散步", "遇到老朋友聊了天", "心情放鬆很開心"],
-          emotion: "開心",
-          quickReplies: [
-            "我有看到～聽起來很棒！",
-            "下次也帶我去那個公園",
-            "謝謝你跟我分享，記得保暖喔"
-          ]
-        };
+    entry.transcript = transcription.text;
+    console.log(`[Groq AI] 逐字稿完成: ${entry.transcript}`);
 
+    // 3. LLM 摘要與分析 (Llama-3-8b)
+    const chatCompletion = await groq.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content: `你是一個溫暖的長輩關懷小助手。
+          請將長輩的語音逐字稿轉化為晚輩易讀的摘要，並以「繁體中文」回傳 JSON。
+          格式包含：
+          - emotion: 情緒（例如：開心、擔心、平靜、寂寞）
+          - summary3: 三行重點清單
+          - quickReplies: 三個適合晚輩回覆長輩的溫馨短語`
+        },
+        { role: "user", content: `這是長輩說的話：${entry.transcript}` }
+      ],
+      model: "llama3-8b-8192",
+      response_format: { type: "json_object" }
+    });
+
+    // 4. 解析 AI 回傳的 JSON
+    const aiResult = JSON.parse(chatCompletion.choices[0].message.content);
+    
+    // 5. 更新資料庫
+    entry.ai = aiResult;
     entry.status = "READY";
     entry.meta.processingMs = Date.now() - t0;
     saveDb(db);
 
-    return res.json({
-      id: entry.id,
-      status: entry.status,
-      ai: entry.ai,
-      meta: entry.meta
-    });
-  }
+    console.log("[Groq AI] 全流程處理成功！");
+    return res.json({ id, status: entry.status, ai: entry.ai });
 
-  // === 非 demoMode（進階） ===
-  // 這裡你之後可以接 STT + LLM
-  entry.status = "FAILED";
-  entry.meta.processingMs = Date.now() - t0;
-  saveDb(db);
-  return res.status(501).json({ error: "non-demo processing not implemented yet" });
+  } catch (error) {
+    console.error("[Groq AI 錯誤]:", error);
+    entry.status = "FAILED";
+    entry.meta.error = error.message;
+    saveDb(db);
+    return res.status(500).json({ error: "AI 處理失敗", detail: error.message });
+  }
 });
 
 /**
