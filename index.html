@@ -2,41 +2,146 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>LINE SWEET HOME </title>
+    <title>LINE SWEET HOME - Demo Mode</title>
     <style>
-        body { display: flex; height: 100vh; margin: 0; font-family: sans-serif; }
-        .side { flex: 1; padding: 20px; border: 1px solid #ccc; display: flex; flex-direction: column; }
-        .elder { background-color: #e8f5e9; } /*淺綠 */
-        .junior { background-color: #e3f2fd; } /*淺藍 */
-        button { padding: 10px; margin: 5px 0; cursor: pointer; font-size: 16px; }
-        .card { background: white; padding: 15px; border-radius: 8px; margin-top: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .status { font-weight: bold; color: #d32f2f; }
+        :root {
+            --line-green: #06C755;
+            --record-red: #ff4d4d;
+            --bg-gray: #f8f9fa;
+        }
+
+        body { 
+            display: flex; height: 100vh; margin: 0; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-gray);
+        }
+
+        .side { flex: 1; padding: 40px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+        .elder { background-color: #ffffff; border-right: 1px solid #eee; }
+        .junior { background-color: #f0f2f5; }
+
+        h2 { margin-bottom: 30px; color: #333; font-weight: 600; }
+
+        /* --- 圓形錄音按鈕 --- */
+        .record-wrapper {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        #record-btn {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background-color: var(--line-green);
+            border: none;
+            box-shadow: 0 6px 20px rgba(6, 199, 85, 0.3);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            position: relative;
+            outline: none;
+        }
+
+        #record-btn.recording {
+            background-color: var(--record-red);
+            animation: pulse 1.5s infinite;
+            box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7);
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(255, 77, 77, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }
+        }
+
+        .mic-icon {
+            width: 20px;
+            height: 35px;
+            background: white;
+            border-radius: 10px;
+            position: relative;
+        }
+        .mic-icon::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: -8px;
+            width: 36px;
+            height: 18px;
+            border: 3px solid white;
+            border-top: 0;
+            border-radius: 0 0 20px 20px;
+        }
+
+        #send-btn {
+            background: #333; color: white; border: none; padding: 12px 30px;
+            border-radius: 25px; font-weight: bold; cursor: pointer;
+            transition: 0.3s; margin-top: 10px;
+        }
+        #send-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+        /* --- 卡片設計 --- */
+        .card {
+            width: 100%; max-width: 350px; background: white; border-radius: 20px;
+            padding: 20px; text-align: left; box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            margin-top: 20px; animation: slideUp 0.5s ease;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .ai-badge {
+            background: var(--line-green); color: white; padding: 4px 12px;
+            border-radius: 12px; font-size: 12px; font-weight: bold; margin-bottom: 10px;
+            display: inline-block;
+        }
+
+        #res-summary { padding-left: 20px; color: #555; line-height: 1.6; }
+
+        #reply-btns button {
+            border: 1px solid var(--line-green); background: white; color: var(--line-green);
+            padding: 8px 15px; border-radius: 15px; margin: 5px; font-size: 13px; font-weight: bold;
+            cursor: pointer; transition: 0.2s;
+        }
+        #reply-btns button:hover { background: var(--line-green); color: white; }
     </style>
 </head>
 <body>
 
 <div class="side elder">
-    <h2>長輩端流程</h2>
-    <p>狀態：<span id="elder-status">待命</span></p>
-    <button id="record-btn">1. 開始錄音</button>
-    <button id="send-btn" disabled>2. 發送給 AI 助手</button>
-    <div id="elder-notice" class="card" style="display:none; border: 2px solid #4caf50;">
-        通知：晚輩已回應你的訊息！
+    <h2>長輩端</h2>
+    <div class="record-wrapper">
+        <button id="record-btn">
+            <div class="mic-icon"></div>
+        </button>
+        <p id="elder-status" style="margin-top: 15px; color: #666; font-weight: 500;">點擊麥克風開始錄音</p>
+    </div>
+    <button id="send-btn" disabled>發送訊息給晚輩</button>
+    
+    <div id="elder-notice" class="card" style="display:none; background: #e8f5e9; border: 1px solid #c8e6c9;">
+        <p style="margin:0; color: #2e7d32; font-weight: bold;"> 晚輩已經回覆你囉！</p>
     </div>
 </div>
 
 <div class="side junior">
-    <h2>晚輩端流程</h2>
-    <p>狀態：<span id="junior-status">等待新訊息...</span></p>
+    <h2>晚輩端</h2>
+    <div id="junior-status" style="color: #999;">等待長輩傳送訊息...</div>
     
     <div id="ai-summary" class="card" style="display:none;">
-        <div style="background:#ffc107; display:inline-block; padding:2px 8px; border-radius:4px;">AI 摘要內容</div>
-        <p><strong>情緒：</strong> <span id="res-emotion"></span></p>
+        <span class="ai-badge">AI 智慧摘要</span>
+        <p><strong>情緒感知：</strong> <span id="res-emotion">分析中...</span></p>
+        <p><strong>訊息重點：</strong></p>
         <ul id="res-summary"></ul>
-        <div id="reply-box">
-            <p>快速回覆：</p>
-            <div id="reply-btns"></div>
-        </div>
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+        <p style="font-size: 13px; color: #999; margin-bottom: 10px;">快速回覆建議：</p>
+        <div id="reply-btns"></div>
     </div>
 </div>
 
@@ -49,50 +154,59 @@
     const sendBtn = document.getElementById('send-btn');
     const elderStatus = document.getElementById('elder-status');
 
+    // --- 錄音邏輯 ---
     recordBtn.onclick = async () => {
-        if (recordBtn.innerText === '1. 開始錄音') {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
-            audioChunks = [];
-            mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-            mediaRecorder.start();
-            recordBtn.innerText = '停止錄音';
-            elderStatus.innerText = '錄音中...';
+        if (!recordBtn.classList.contains('recording')) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                mediaRecorder.start();
+
+                recordBtn.classList.add('recording'); 
+                elderStatus.innerText = '錄音中...再點擊一次停止';
+                sendBtn.disabled = true;
+            } catch (err) {
+                alert("請開啟麥克風權限");
+            }
         } else {
             mediaRecorder.stop();
-            recordBtn.innerText = '1. 開始錄音';
+            recordBtn.classList.remove('recording');
             elderStatus.innerText = '錄音完畢，準備發送';
             sendBtn.disabled = false;
         }
     };
 
+    // --- 發送與分析 ---
     sendBtn.onclick = async () => {
         const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
         const formData = new FormData();
         formData.append('audio', audioBlob, 'voice_input.webm'); 
 
         try {
-            elderStatus.innerText = '正在上傳音檔...';
+            elderStatus.innerText = '正在傳送...';
+            sendBtn.disabled = true;
+
             const res = await fetch(`${API_BASE}/v1/entries`, { method: 'POST', body: formData });
             const data = await res.json();
             
             localStorage.setItem('target_id', data.id);
-            console.log("上傳成功，取得 ID:", data.id);
+            console.log("上傳成功 ID:", data.id);
             
-            elderStatus.innerText = '上傳成功，AI 分析中...';
-            sendBtn.disabled = true;
-
-            // 觸發 AI 處理
+            // 踢一下 AI 處理
             await fetch(`${API_BASE}/v1/entries/${data.id}/process`, { method: 'POST' });
             
+            elderStatus.innerText = '傳送成功！等待 AI 分析...';
             startPolling();
 
         } catch (err) {
-            console.error("發送失敗:", err);
-            elderStatus.innerText = '發送出錯，請檢查 Server';
+            elderStatus.innerText = '伺服器連線失敗';
+            sendBtn.disabled = false;
         }
     };
 
+    // --- 輪詢監聽 ---
     function startPolling() {
         if (window.activeTimer) clearInterval(window.activeTimer);
 
@@ -105,24 +219,17 @@
                 if (!res.ok) return;
                 
                 const data = await res.json();
-                console.log(`監聽 ID: ${pollId}, 狀態: ${data.status}`);
+                console.log(`Status Check: ${data.status}`);
 
-                // --- 核心修正處：嚴格檢查 AI 資料是否真的「有內容」了 ---
                 if (data.status === 'READY' && data.ai && data.ai.summary3 && data.ai.summary3.length > 0) {
-                    document.getElementById('junior-status').innerText = '收到新訊息！';
+                    document.getElementById('junior-status').innerText = '收到最新摘要';
                     document.getElementById('ai-summary').style.display = 'block';
-                    document.getElementById('res-emotion').innerText = data.ai.emotion || "分析中";
+                    document.getElementById('res-emotion').innerText = data.ai.emotion;
+                    document.getElementById('res-summary').innerHTML = data.ai.summary3.map(s => `<li>${s}</li>`).join('');
                     
-                    // 渲染摘要清單
-                    document.getElementById('res-summary').innerHTML = data.ai.summary3
-                        .map(s => `<li>${s}</li>`).join('');
-                    
-                    // 渲染回覆按鈕
-                    if (data.ai.quickReplies) {
-                        document.getElementById('reply-btns').innerHTML = data.ai.quickReplies
-                            .map(text => `<button onclick="sendReply('${pollId}', '${text}')">${text}</button>`)
-                            .join('');
-                    }
+                    document.getElementById('reply-btns').innerHTML = data.ai.quickReplies.map(text => 
+                        `<button onclick="sendReply('${pollId}', '${text}')">${text}</button>`
+                    ).join('');
                 }
 
                 if (data.status === 'REPLIED') {
@@ -130,7 +237,7 @@
                     clearInterval(window.activeTimer);
                 }
             } catch (err) {
-                console.log("正在等待 AI 回應...");
+                console.log("Waiting...");
             }
         }, 2000);
     }
@@ -141,7 +248,7 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text })
         });
-        alert('回覆已送出');
+        alert('回覆已傳送！');
     }
 
     window.onload = () => {
