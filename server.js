@@ -181,6 +181,6 @@ app.post("/v1/entries/:id/reply", (req, res) => {
 });
 
 const PORT = process.env.PORT || 8787;
-app.listen(PORT, () => {
-  console.log(`SweetHome API running on http://localhost:${PORT}`);
-});
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`SweetHome API running on port ${PORT}`);
+}); // 為了讓 PORT 可以抓環境變數跟監聽 0.0.0.0
