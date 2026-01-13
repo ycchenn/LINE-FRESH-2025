@@ -43,10 +43,8 @@
 <script>
     let mediaRecorder;
     let audioChunks = [];
-    let currentId = null;
     const API_BASE = "http://localhost:8787";
 
-    // --- 長輩端邏輯 ---
     const recordBtn = document.getElementById('record-btn');
     const sendBtn = document.getElementById('send-btn');
     const elderStatus = document.getElementById('elder-status');
@@ -73,50 +71,84 @@
         const formData = new FormData();
         formData.append('audio', audioBlob, 'voice_sick.webm'); 
 
-        const res = await fetch(`${API_BASE}/v1/entries`, { method: 'POST', body: formData });
-        const data = await res.json();
-        currentId = data.id;
-        elderStatus.innerText = '訊息已發送至雲端 (ID: ' + currentId + ')';
-        sendBtn.disabled = true;
+        try {
+            elderStatus.innerText = '正在上傳音檔...';
+            const res = await fetch(`${API_BASE}/v1/entries`, { method: 'POST', body: formData });
+            const data = await res.json();
+            
+            // 【重要】直接存入 localStorage，讓所有人都能拿到
+            localStorage.setItem('target_id', data.id);
+            console.log("上傳成功，取得 ID:", data.id);
+            
+            elderStatus.innerText = '上傳成功 (ID: ' + data.id + ')';
+            sendBtn.disabled = true;
 
-        
-        await fetch(`${API_BASE}/v1/entries/${currentId}/process`, { method: 'POST' });
-        startPolling(); // 開始監聽晚輩端
+            // 觸發 AI 處理
+            await fetch(`${API_BASE}/v1/entries/${data.id}/process`, { method: 'POST' });
+            
+            // 直接啟動監聽
+            startPolling();
+
+        } catch (err) {
+            console.error("發送失敗:", err);
+            elderStatus.innerText = '發送出錯，請檢查 Server';
+        }
     };
 
-    // --- 晚輩端監聽邏輯 (Polling) ---
+    // --- 晚輩端監聽邏輯 ---
     function startPolling() {
-        const timer = setInterval(async () => {
-            const res = await fetch(`${API_BASE}/v1/entries/${currentId}`);
-            const data = await res.json();
+        // 每次啟動前先清掉舊的計時器，避免疊加
+        if (window.activeTimer) clearInterval(window.activeTimer);
 
-            if (data.status === 'READY') {
-                document.getElementById('junior-status').innerText = '收到新訊息！';
-                document.getElementById('ai-summary').style.display = 'block';
-                document.getElementById('res-emotion').innerText = data.ai.emotion;
-                document.getElementById('res-summary').innerHTML = data.ai.summary3.map(s => `<li>${s}</li>`).join('');
+        window.activeTimer = setInterval(async () => {
+            // 從 LocalStorage 拿 ID
+            const pollId = localStorage.getItem('target_id');
+            if (!pollId) return;
+
+            try {
+                const res = await fetch(`${API_BASE}/v1/entries/${pollId}`);
+                if (!res.ok) return;
                 
-                // 渲染回覆按鈕
-                document.getElementById('reply-btns').innerHTML = data.ai.quickReplies.map(text => 
-                    `<button onclick="sendReply('${text}')">${text}</button>`
-                ).join('');
-            }
+                const data = await res.json();
+                console.log(`監聽 ID: ${pollId}, 狀態: ${data.status}`);
 
-            if (data.status === 'REPLIED') {
-                document.getElementById('elder-notice').style.display = 'block';
-                clearInterval(timer); // 停止監聽
+                // 只要狀態是 READY 或內容已經跑出來了就顯示
+                if ((data.status === 'READY' || data.ai) && data.ai.summary3) {
+                    document.getElementById('junior-status').innerText = '🔥 收到新訊息！';
+                    document.getElementById('ai-summary').style.display = 'block';
+                    document.getElementById('res-emotion').innerText = data.ai.emotion;
+                    document.getElementById('res-summary').innerHTML = data.ai.summary3.map(s => `<li>${s}</li>`).join('');
+                    
+                    document.getElementById('reply-btns').innerHTML = data.ai.quickReplies.map(text => 
+                        `<button onclick="sendReply('${pollId}', '${text}')">${text}</button>`
+                    ).join('');
+                }
+
+                if (data.status === 'REPLIED') {
+                    document.getElementById('elder-notice').style.display = 'block';
+                    clearInterval(window.activeTimer);
+                }
+            } catch (err) {
+                console.log("等待伺服器回應...");
             }
         }, 2000);
     }
 
-    async function sendReply(text) {
-        await fetch(`${API_BASE}/v1/entries/${currentId}/reply`, {
+    async function sendReply(id, text) {
+        await fetch(`${API_BASE}/v1/entries/${id}/reply`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text })
         });
         alert('回覆已送出');
     }
+
+    // 頁面載入時，如果發現有舊的 ID，自動開啟監聽（Demo 保險）
+    window.onload = () => {
+        if (localStorage.getItem('target_id')) {
+            startPolling();
+        }
+    };
 </script>
 </body>
 </html>
