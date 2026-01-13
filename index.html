@@ -114,7 +114,7 @@
 
                 // 只要狀態是 READY 或內容已經跑出來了就顯示
                 if ((data.status === 'READY' || data.ai) && data.ai.summary3) {
-                    document.getElementById('junior-status').innerText = '🔥 收到新訊息！';
+                    document.getElementById('junior-status').innerText = '收到新訊息！';
                     document.getElementById('ai-summary').style.display = 'block';
                     document.getElementById('res-emotion').innerText = data.ai.emotion;
                     document.getElementById('res-summary').innerHTML = data.ai.summary3.map(s => `<li>${s}</li>`).join('');
