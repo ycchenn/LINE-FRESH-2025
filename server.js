@@ -15,6 +15,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// 告訴伺服器，當有人訪問 "/" (首頁) 時，把 index.html 檔案傳給他
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
+
 const UPLOAD_DIR = path.join(__dirname, "uploads");
 const DB_PATH = path.join(__dirname, "db.json");
 
