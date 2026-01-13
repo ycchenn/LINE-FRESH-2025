@@ -15,9 +15,17 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 告訴伺服器，當有人訪問 "/" (首頁) 時，把 index.html 檔案傳給他
+// --- 在 server.js 裡面，把原本的 app.get("/") 換成這段 ---
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"));
+  const indexPath = path.join(__dirname, "index.html");
+  console.log("正在嘗試讀取 UI 檔案：", indexPath);
+  
+  // 檢查檔案是否存在，如果不存在會噴錯在 Render 的 Logs 裡
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).send("找不到 index.html，請確認它在根目錄！");
+  }
 });
 
 const UPLOAD_DIR = path.join(__dirname, "uploads");
