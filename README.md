@@ -5,7 +5,7 @@
 [![Status](https://img.shields.io/badge/Status-Live-green)](https://line-fresh-2025.onrender.com/)
 
 > **LINE FRESH 2025 參賽作品**：利用真 AI 技術縮小長晚輩間數位鴻溝，找尋幸福感解方。
-> **The Team " YAYA爺爺 " - BY YC CHEN,TY HUANG,ALAN SHAO,LINDA KUO 
+> The Team " YAYA爺爺 " - BY YC CHEN,TY HUANG,ALAN SHAO,LINDA KUO 
 
 ## 核心理念
 許多長輩不習慣輸入文字，偏好語音留言，但晚輩常因開會或忙碌無法即時聽取。LINE Sweet Home 透過最新的語音模型，將長輩的語音即時轉化為情緒摘要與行動重點，讓關懷不再漏接。
